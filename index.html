@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natación Tracker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d47a1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>🏊 Natación Tracker</h1>
+
+    <div class="menu">
+        <button onclick="mostrarSeccion('crear')">Nueva Sesión</button>
+        <button onclick="mostrarSeccion('sesiones')">Ver Sesiones</button>
+        <button onclick="mostrarSeccion('estadisticas')">Estadísticas</button>
+        <button onclick="exportarDatos()">Exportar</button>
+        <button onclick="importarDatos()">Importar</button>
+    </div>
+
+    <div id="contenido"></div>
+
+    <script src="app.js"></script>
+    <script>
+    if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("Service Worker registrado"));
+    }
+</script>
+</body>
+</html>
