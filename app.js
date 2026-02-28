@@ -1,3 +1,4 @@
+//
 let db;
 const request = indexedDB.open("NatacionDB", 1);
 let estilosPredeterminados = ["Crol", "Espalda", "Pecho", "Mariposa", "Técnica"];
@@ -605,3 +606,4 @@ function exportarDatos() {
     };
 
 }
+
