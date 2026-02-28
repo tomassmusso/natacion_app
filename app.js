@@ -1,332 +1,570 @@
 let db;
-
-// Abrir base de datos
 const request = indexedDB.open("NatacionDB", 1);
+let estilosPredeterminados = ["Crol", "Espalda", "Pecho", "Mariposa", "Técnica"];
 
-request.onupgradeneeded = function (event) {
-    db = event.target.result;
 
-    // Tabla sesiones
-    const sesionesStore = db.createObjectStore("sesiones", {
-        keyPath: "id",
-        autoIncrement: true
-    });
-
-    sesionesStore.createIndex("fecha", "fecha", { unique: false });
-
-    // Tabla bloques
-    const bloquesStore = db.createObjectStore("bloques", {
-        keyPath: "id",
-        autoIncrement: true
-    });
-
-    bloquesStore.createIndex("sesion_id", "sesion_id", { unique: false });
-};
-
-request.onsuccess = function (event) {
-    db = event.target.result;
-    console.log("Base de datos lista");
-};
-
-request.onerror = function () {
-    console.log("Error al abrir la base");
-};
-
-function formatearFecha(fechaISO) {
-    const fecha = new Date(fechaISO);
-    const dia = String(fecha.getDate()).padStart(2, '0');
-    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-    const anio = fecha.getFullYear();
-
-    return `${dia}/${mes}/${anio}`;
+function agregarInputEstilo() {
+    const div = document.createElement("div");
+    div.style = "display:flex; gap:10px; margin-bottom:10px; align-items:center;";
+    div.innerHTML = `
+        <input type="text" placeholder="Nuevo estilo..." class="nuevo-estilo-input" style="margin:0;">
+        <button onclick="this.parentElement.remove()" class="btn-danger-sm">X</button>
+    `;
+    document.getElementById("lista-estilos-edit").appendChild(div);
 }
 
-function mostrarSeccion(seccion) {
-    const contenido = document.getElementById("contenido");
-
-    if (seccion === "crear") {
-    const hoy = new Date().toISOString().split("T")[0];
-
-    contenido.innerHTML = `
-        <h2>Nueva Sesión</h2>
-        <label>Fecha:</label><br>
-        <input type="date" id="fecha" value="${hoy}"><br><br>
-        <label>Notas:</label><br>
-        <input type="text" id="notas" placeholder="Opcional"><br><br>
-        <button onclick="crearSesion()">Crear sesión</button>
-        `;
-    }
-
-    if (seccion === "sesiones") {
-        listarSesiones();
-    }
-
-    if (seccion === "estadisticas") {
-        mostrarEstadisticas();
-    }
+function guardarConfigEstilos() {
+    const inputs = document.querySelectorAll("#lista-estilos-edit input");
+    const nuevosEstilos = Array.from(inputs).map(i => i.value).filter(v => v.trim() !== "");
+    localStorage.setItem("misEstilos", JSON.stringify(nuevosEstilos));
+    cerrarVistaSecundaria();
+    alert("Estilos actualizados correctamente");
 }
 
-function crearSesion() {
-    const fechaInput = document.getElementById("fecha").value;
-    const notas = document.getElementById("notas").value;
+request.onupgradeneeded = (e) => {
+    db = e.target.result;
+    db.createObjectStore("sesiones", { keyPath: "id", autoIncrement: true }).createIndex("fecha", "fecha");
+    db.createObjectStore("bloques", { keyPath: "id", autoIncrement: true }).createIndex("sesion_id", "sesion_id");
+};
 
-    if (!fechaInput) {
-        alert("Elegí una fecha");
-        return;
-    }
+request.onsuccess = (e) => {
+    db = e.target.result;
+    actualizarDashboard(); 
+    if(localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+};
 
-    const fechaISO = new Date(fechaInput).toISOString();
-
-    const transaction = db.transaction(["sesiones"], "readwrite");
-    const store = transaction.objectStore("sesiones");
-
-    store.add({
-        fecha: fechaISO,
-        notas: notas,
-        distancia_total: 0,
-        duracion_total: 0
-    });
-
-    transaction.oncomplete = function () {
-        alert("Sesión creada");
-        listarSesiones();
-    };
+// --- LOGICA DE VISTAS ---
+function actualizarDashboard() {
+    listarSesiones('lista-sesiones');
+    obtenerDatosEstadisticas();
 }
 
-function listarSesiones() {
-    const contenido = document.getElementById("contenido");
-    contenido.innerHTML = "<h2>Sesiones</h2>";
+function cerrarVistaSecundaria() {
+    document.getElementById("vista-secundaria").classList.add("hidden");
+    actualizarDashboard();
+}
 
-    const transaction = db.transaction(["sesiones"], "readonly");
-    const store = transaction.objectStore("sesiones");
 
+// --- SESIONES ---
+function listarSesiones(targetId) {
+    const contenedor = document.getElementById(targetId);
+    contenedor.innerHTML = "";
+
+    const tx = db.transaction(["sesiones", "bloques"], "readonly");
+    const storeSesiones = tx.objectStore("sesiones");
+    const storeBloques = tx.objectStore("bloques");
     let sesiones = [];
 
-    store.openCursor().onsuccess = function (event) {
-        const cursor = event.target.result;
-
-        if (cursor) {
-            sesiones.push(cursor.value);
-            cursor.continue();
-        } else {
-            // Ordenar por fecha ascendente (más vieja primero)
-            sesiones.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-
-            sesiones.forEach(sesion => {
-                contenido.innerHTML += `
-                    <div class="card">
-                        <strong>${formatearFecha(sesion.fecha)}</strong><br>
-                        Distancia: ${sesion.distancia_total} m<br>
-                        Duración: ${sesion.duracion_total} min<br><br>
-                        <button onclick="mostrarAgregarBloque(${sesion.id})">Agregar bloque</button>
-                    </div>
+    storeSesiones.openCursor().onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) { sesiones.push(cursor.value); cursor.continue(); }
+        else {
+            sesiones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+            sesiones.forEach(s => {
+                const ritmo = s.duracion_total > 0 ? (s.distancia_total / s.duracion_total).toFixed(1) : 0;
+                
+                const divSesion = document.createElement("div");
+                divSesion.className = "card-sesion";
+                
+                divSesion.innerHTML = `
+                    <details ontoggle="if(this.open) cargarBloquesSesion(${s.id})">
+                        <summary style="list-style:none; cursor:pointer;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <strong style="font-size:1.1em;">${formatearFecha(s.fecha)}</strong><br>
+                                    <small style="color:var(--text-muted)">${s.distancia_total}m | ${s.duracion_total}min</small>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <span style="color:var(--primary); font-weight:bold; margin-right:5px;">${ritmo} <small style="font-weight:normal">m/min</small></span>
+                                    <button class="btn-icon" onclick="prepararEdicionSesion(${s.id}, event)">✏️</button>
+                                    <button class="btn-icon" onclick="borrarSesion(${s.id}, event)" style="color:var(--danger)">🗑️</button>
+                                </div>
+                            </div>
+                        </summary>
+                        <div id="bloques-sesion-${s.id}" style="padding:15px 0 0 0; font-size:0.9em; border-top:1px solid var(--border); margin-top:15px;">
+                            <p style="color:var(--text-muted); margin-top:0;"><em>${s.notas || 'Sin notas'}</em></p>
+                            <div class="lista-bloques-interna"></div>
+                            <button class="btn-secondary" onclick="mostrarAgregarBloque(${s.id})" style="margin-top:15px; width:100%">+ Agregar Bloque</button>
+                        </div>
+                    </details>
                 `;
+                contenedor.appendChild(divSesion);
             });
         }
     };
 }
 
-function mostrarAgregarBloque(sesionId) {
-    const contenido = document.getElementById("contenido");
+// --- GESTIÓN DE BLOQUES ---
+function guardarNuevoBloque(sesionId) {
+    const estilo = document.getElementById("bloque-estilo").value;
+    const distancia = parseInt(document.getElementById("bloque-distancia").value);
+    const duracion = parseInt(document.getElementById("bloque-duracion").value);
 
-    contenido.innerHTML = `
-        <h2>Agregar Bloque</h2>
-        <input type="text" id="estilo" placeholder="Estilo"><br><br>
-        <input type="number" id="distancia" placeholder="Distancia (m)"><br><br>
-        <input type="number" id="duracion" placeholder="Duración (min)"><br><br>
-        <button onclick="agregarBloque(${sesionId})">Guardar</button>
-    `;
-}
+    if (!estilo || isNaN(distancia) || isNaN(duracion)) {
+        alert("Por favor, completa todos los campos correctamente.");
+        return;
+    }
 
-function agregarBloque(sesionId) {
-    const estilo = document.getElementById("estilo").value;
-    const distancia = parseInt(document.getElementById("distancia").value);
-    const duracion = parseInt(document.getElementById("duracion").value);
+    const tx = db.transaction(["bloques", "sesiones"], "readwrite");
+    const storeBloques = tx.objectStore("bloques");
+    const storeSesiones = tx.objectStore("sesiones");
 
-    const transaction = db.transaction(["bloques", "sesiones"], "readwrite");
-    const bloquesStore = transaction.objectStore("bloques");
-    const sesionesStore = transaction.objectStore("sesiones");
-
-    // Agregar bloque
-    bloquesStore.add({
+    storeBloques.add({
         sesion_id: sesionId,
         estilo: estilo,
         distancia: distancia,
         duracion: duracion
     });
 
-    // Actualizar totales en sesión
-    const request = sesionesStore.get(sesionId);
-
-    request.onsuccess = function () {
-        const sesion = request.result;
-
-        sesion.distancia_total += distancia;
-        sesion.duracion_total += duracion;
-
-        sesionesStore.put(sesion);
+    storeSesiones.get(sesionId).onsuccess = (e) => {
+        const sesion = e.target.result;
+        sesion.distancia_total = (sesion.distancia_total || 0) + distancia;
+        sesion.duracion_total = (sesion.duracion_total || 0) + duracion;
+        storeSesiones.put(sesion);
     };
 
-    transaction.oncomplete = function () {
-        alert("Bloque agregado");
-        listarSesiones();
+    tx.oncomplete = () => {
+        console.log("Bloque guardado y sesión actualizada");
+        cerrarVistaSecundaria(); 
     };
 }
 
-function mostrarEstadisticas() {
-    const contenido = document.getElementById("contenido");
-    contenido.innerHTML = "<h2>Estadísticas</h2>";
 
-    const transaction = db.transaction(["sesiones", "bloques"], "readonly");
-    const sesionesStore = transaction.objectStore("sesiones");
-    const bloquesStore = transaction.objectStore("bloques");
+function cargarBloquesSesion(sesionId) {
+    const contenedor = document.querySelector(`#bloques-sesion-${sesionId} .lista-bloques-interna`);
+    contenedor.innerHTML = "<small>Cargando bloques...</small>";
+
+    const tx = db.transaction(["bloques"], "readonly");
+    const index = tx.objectStore("bloques").index("sesion_id");
+    let html = "";
+
+    index.openCursor(IDBKeyRange.only(sesionId)).onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+            const b = cursor.value;
+            html += `
+                <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--border); align-items:center;">
+                    <span><strong>${b.estilo}</strong>: ${b.distancia}m (${b.duracion}min)</span>
+                    <button class="btn-icon" onclick="borrarBloque(${b.id}, ${sesionId})" style="color:var(--danger)">❌</button>
+                </div>
+            `;
+            cursor.continue();
+        } else {
+            contenedor.innerHTML = html || "<p style='color:var(--text-muted)'>No hay bloques cargados.</p>";
+        }
+    };
+}
+
+function borrarBloque(bloqueId, sesionId) {
+    if (!confirm("¿Borrar este bloque?")) return;
+
+    const tx = db.transaction(["bloques", "sesiones"], "readwrite");
+    const storeBloques = tx.objectStore("bloques");
+    const storeSesiones = tx.objectStore("sesiones");
+
+    storeBloques.get(bloqueId).onsuccess = (e) => {
+        const bloque = e.target.result;
+        storeSesiones.get(sesionId).onsuccess = (e2) => {
+            const sesion = e2.target.result;
+            sesion.distancia_total -= bloque.distancia;
+            sesion.duracion_total -= bloque.duracion;
+            storeSesiones.put(sesion);
+            storeBloques.delete(bloqueId);
+        };
+    };
+
+    tx.oncomplete = () => actualizarDashboard();
+}
+
+// --- EDICIÓN DE SESIÓN ---
+
+
+function guardarEdicionSesion(id) {
+    const nuevaFecha = document.getElementById("edit-fecha").value;
+    const nuevasNotas = document.getElementById("edit-notas").value;
+
+    const tx = db.transaction(["sesiones"], "readwrite");
+    const store = tx.objectStore("sesiones");
+
+    store.get(id).onsuccess = (e) => {
+        const sesion = e.target.result;
+        sesion.fecha = new Date(nuevaFecha).toISOString();
+        sesion.notas = nuevasNotas;
+        store.put(sesion);
+    };
+
+    tx.oncomplete = () => cerrarVistaSecundaria();
+}
+
+// --- ESTADISTICAS ---
+function obtenerDatosEstadisticas() {
+    const tx = db.transaction(["sesiones", "bloques"], "readonly");
+    const sesionesStore = tx.objectStore("sesiones");
+    const bloquesStore = tx.objectStore("bloques");
 
     let sesiones = [];
     let bloques = [];
 
-    // Cargar sesiones
-    sesionesStore.openCursor().onsuccess = function (event) {
-        const cursor = event.target.result;
-        if (cursor) {
-            sesiones.push(cursor.value);
-            cursor.continue();
-        } else {
-            // Cuando terminan sesiones, cargamos bloques
-            bloquesStore.openCursor().onsuccess = function (event) {
-                const cursorBloque = event.target.result;
-                if (cursorBloque) {
-                    bloques.push(cursorBloque.value);
-                    cursorBloque.continue();
-                } else {
-                    procesarEstadisticas(sesiones, bloques);
-                }
-            };
-        }
+    sesionesStore.getAll().onsuccess = (e) => {
+        sesiones = e.target.result;
+        bloquesStore.getAll().onsuccess = (e) => {
+            bloques = e.target.result;
+            procesarEstadisticasDashboard(sesiones, bloques);
+        };
     };
 }
 
-function procesarEstadisticas(sesiones, bloques) {
-    const contenido = document.getElementById("contenido");
-
+function procesarEstadisticasDashboard(sesiones, bloques) {
+    const contenedor = document.getElementById("resumen-stats");
     if (sesiones.length === 0) {
-        contenido.innerHTML += "<p>No hay datos todavía.</p>";
+        contenedor.innerHTML = "<p style='color:var(--text-muted); text-align:center;'>Aún no hay sesiones registradas.</p>";
         return;
     }
 
-    // ---------- RESUMEN GENERAL ----------
-    let totalSesiones = sesiones.length;
     let distanciaTotal = 0;
-    let duracionTotal = 0;
-
-    let mejorDistancia = 0;
-    let mejorDistanciaFecha = null;
-    let mejorRitmo = 0;
-    let mejorRitmoFecha = null;
-
-    sesiones.forEach(s => {
-        distanciaTotal += s.distancia_total;
-        duracionTotal += s.duracion_total;
-
-        // Mejor distancia
-        if (s.distancia_total > mejorDistancia) {
-            mejorDistancia = s.distancia_total;
-            mejorDistanciaFecha = s.fecha;
-        }
-
-        // Mejor ritmo
-        if (s.duracion_total > 0) {
-            const ritmo = s.distancia_total / s.duracion_total;
-            if (ritmo > mejorRitmo) {
-                mejorRitmo = ritmo;
-                mejorRitmoFecha = s.fecha;
-            }
-        }
-    });
-
-    const promedioDistancia = (distanciaTotal / totalSesiones).toFixed(1);
-    const promedioDuracion = (duracionTotal / totalSesiones).toFixed(1);
-    const ritmoHistorico = (distanciaTotal / duracionTotal).toFixed(2);
-
-    contenido.innerHTML += `
-        <h3>Resumen General</h3>
-        <p>Sesiones: ${totalSesiones}</p>
-        <p>Distancia total: ${distanciaTotal} m</p>
-        <p>Duración total: ${duracionTotal} min</p>
-        <p>Promedio distancia: ${promedioDistancia} m</p>
-        <p>Promedio duración: ${promedioDuracion} min</p>
-        <p>Ritmo promedio histórico: ${ritmoHistorico} m/min</p>
-    `;
-
-    // ---------- MEJOR DISTANCIA ----------
-    if (mejorDistanciaFecha) {
-        contenido.innerHTML += `
-            <h3 class='section-title'>Mejor Distancia</h3>
-            <p>${formatearFecha(mejorDistanciaFecha)} | ${mejorDistancia} m</p>
-        `;
-    }
-
-    // ---------- MEJOR RITMO ----------
-    if (mejorRitmoFecha) {
-        contenido.innerHTML += `
-            <h3 class='section-title'>Mejor Ritmo</h3>
-            <p>${formatearFecha(mejorRitmoFecha)} | ${mejorRitmo.toFixed(2)} m/min</p>
-        `;
-    }
-
-    // ---------- DIVISIÓN POR MES ----------
+    let tiempoTotal = 0;
+    let mejorDistancia = { valor: 0, fecha: '' };
+    let mejorRitmo = { valor: 0, fecha: '' };
     let porMes = {};
 
     sesiones.forEach(s => {
-        const fecha = new Date(s.fecha);
-        const clave = `${fecha.getFullYear()}-${fecha.getMonth()}`;
+        const dist = s.distancia_total || 0;
+        const tiempo = s.duracion_total || 0;
+        distanciaTotal += dist;
+        tiempoTotal += tiempo;
 
-        if (!porMes[clave]) {
-            porMes[clave] = {
-                sesiones: 0,
-                distancia: 0,
-                duracion: 0,
-                mesTexto: fecha.toLocaleString("es-ES", { month: "long" }).toUpperCase(),
-                anio: fecha.getFullYear()
+        if (dist > mejorDistancia.valor) { mejorDistancia = { valor: dist, fecha: s.fecha }; }
+        if (tiempo > 0) {
+            const ritmoSesion = dist / tiempo;
+            if (ritmoSesion > mejorRitmo.valor) { mejorRitmo = { valor: ritmoSesion, fecha: s.fecha }; }
+        }
+
+        const fechaObj = new Date(s.fecha);
+        const claveMes = `${fechaObj.getFullYear()}-${fechaObj.getMonth() + 1}`;
+        if (!porMes[claveMes]) {
+            porMes[claveMes] = { 
+                nombre: fechaObj.toLocaleString('es-ES', { month: 'long', year: 'numeric' }), 
+                distancia: 0, sesiones: 0, tiempo: 0 
             };
         }
-
-        porMes[clave].sesiones++;
-        porMes[clave].distancia += s.distancia_total;
-        porMes[clave].duracion += s.duracion_total;
+        porMes[claveMes].distancia += dist;
+        porMes[claveMes].sesiones += 1;
+        porMes[claveMes].tiempo += tiempo;
     });
 
-    contenido.innerHTML += "<h3 class='section-title'>Por Mes</h3>";
+    const ritmoMedio = tiempoTotal > 0 ? (distanciaTotal / tiempoTotal).toFixed(1) : 0;
 
-    Object.values(porMes).forEach(m => {
-        const promedioMes = (m.distancia / m.sesiones).toFixed(1);
-
-        contenido.innerHTML += `
-            <div style="margin-bottom:10px;">
-                <strong>${m.mesTexto} ${m.anio}</strong><br>
-                ${m.sesiones} sesiones<br>
-                ${m.distancia} m totales<br>
-                Promedio: ${promedioMes} m
+    contenedor.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; text-align: center; margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <div class="stat-item">
+                <small>SESIONES</small>
+                <div style="font-size: 1.1em; font-weight: bold; color: var(--primary);">${sesiones.length}</div>
             </div>
-        `;
-    });
+            <div class="stat-item">
+                <small>METROS</small>
+                <div style="font-size: 1.1em; font-weight: bold; color: var(--primary);">${distanciaTotal}m</div>
+            </div>
+            <div class="stat-item">
+                <small>TIEMPO</small>
+                <div style="font-size: 1.1em; font-weight: bold; color: var(--primary);">${tiempoTotal} min</div>
+            </div>
+            <div class="stat-item">
+                <small>RITMO</small>
+                <div style="font-size: 1.1em; font-weight: bold; color: var(--primary);">${ritmoMedio} m/min</div>
+            </div>
+        </div>
 
-    // ---------- DIVISIÓN POR ESTILO ----------
-    let porEstilo = {};
+        <div style="background: rgba(10, 132, 255, 0.08); border-radius: 10px; padding: 12px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div>
+                    <small style="color: var(--primary); font-weight: bold;">🏆 MAX DISTANCIA</small>
+                    <div style="font-size: 1.1em; font-weight: bold;">${mejorDistancia.valor}m</div>
+                    <small style="font-size: 0.75em; color: var(--text-muted);">${formatearFecha(mejorDistancia.fecha)}</small>
+                </div>
+                <div style="border-left: 1px solid rgba(0,0,0,0.1); padding-left: 10px;">
+                    <small style="color: var(--primary); font-weight: bold;">⚡ MEJOR RITMO</small>
+                    <div style="font-size: 1.1em; font-weight: bold;">${mejorRitmo.valor.toFixed(1)} m/min</div>
+                    <small style="font-size: 0.75em; color: var(--text-muted);">${formatearFecha(mejorRitmo.fecha)}</small>
+                </div>
+            </div>
+        </div>
 
-    bloques.forEach(b => {
-        if (!porEstilo[b.estilo]) {
-            porEstilo[b.estilo] = 0;
+        <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+            <small style="font-weight: bold; display: block; margin-bottom: 10px;">HISTORIAL MENSUAL</small>
+            <div id="tabla-mes-container">
+                <table style="width: 100%; font-size: 0.9em; text-align: left; border-collapse: collapse;">
+                    <thead>
+                        <tr style="color: var(--text-muted); border-bottom: 1px solid var(--border);">
+                            <th style="padding: 5px 0;">Mes</th>
+                            <th>Ses.</th>
+                            <th>Dist.</th>
+                            <th>Ritmo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.keys(porMes).map(clave => {
+                            const m = porMes[clave];
+                            const ritmoMes = m.tiempo > 0 ? (m.distancia / m.tiempo).toFixed(1) : 0;
+                            return `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 10px 0; text-transform: capitalize; font-weight: bold;">${m.nombre}</td>
+                                    <td style="color: var(--text-muted);">${m.sesiones}</td>
+                                    <td style="color: var(--text-muted);">${m.distancia}m</td>
+                                    <td style="color: var(--text-muted); font-weight:bold;">${ritmoMes} <small style="font-weight:normal">m/min</small></td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function generarTablaMesHTML(datosMes, filtro = "todos") {
+    let html = `<table style="width: 100%; font-size: 0.85em; text-align: left; border-collapse: collapse;">
+        <thead>
+            <tr style="color: #888; border-bottom: 1px solid #eee;">
+                <th style="padding: 5px 0;">Mes</th>
+                <th>Sesiones</th>
+                <th>Total Dist.</th>
+            </tr>
+        </thead>
+        <tbody>`;
+    Object.keys(datosMes).forEach(clave => {
+        if (filtro === "todos" || filtro === clave) {
+            const m = datosMes[clave];
+            html += `<tr style="border-bottom: 1px solid #f9f9f9;">
+                <td style="padding: 8px 0; text-transform: capitalize;">${m.nombre}</td>
+                <td>${m.sesiones}</td>
+                <td><strong>${m.distancia}m</strong></td>
+            </tr>`;
         }
-        porEstilo[b.estilo] += b.distancia;
     });
+    html += `</tbody></table>`;
+    return html;
+}
 
-    contenido.innerHTML += "<h3 class='section-title'>Por Estilo</h3>";
+function filtrarTablaMes(valor) {
+    obtenerDatosEstadisticas(); 
+}
 
-    Object.keys(porEstilo).forEach(estilo => {
-        contenido.innerHTML += `
-            <div>
-                ${estilo}: ${porEstilo[estilo]} m
+// --- UTILIDADES ---
+// --- VISTAS DE INFORMACIÓN (Sin botones redundantes) ---
+// 1. EDITAR ESTILOS (Configuración)
+function configurarEstilos() {
+    // Solo cierra el menú si la clase 'active' está presente (evita el rebote al borrar)
+    const menu = document.getElementById("sideMenu");
+    if (menu.classList.contains("active")) {
+        toggleMenu();
+    }
+
+    const estilos = JSON.parse(localStorage.getItem("misEstilos")) || estilosPredeterminados;
+    const vista = document.getElementById("vista-secundaria");
+    const cont = document.getElementById("contenido-secundario");
+    
+    vista.classList.remove("hidden");
+    cont.innerHTML = `
+        <div class="cuadro-dashboard" style="margin: 15px;">
+            <h2 style="margin-top:0;">Mis Estilos</h2>
+            <div id="lista-estilos-edit" style="margin-bottom: 20px;">
+                ${estilos.map((e, i) => `
+                    <div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
+                        <input type="text" value="${e}" 
+                               onchange="actualizarEstiloIndividual(${i}, this.value)" 
+                               style="margin:0; flex-grow: 1;">
+                        <button onclick="eliminarEstilo(${i})" 
+                                class="btn-danger-sm" 
+                                style="width:45px; height:45px; flex-shrink:0;">✕</button>
+                    </div>
+                `).join('')}
+            </div>
+            <button onclick="agregarInputEstilo()" class="btn-secondary" style="width:100%; margin-bottom:15px;">+ Nuevo Estilo</button>
+            <button onclick="guardarConfigEstilos()" class="btn-primary" style="width:100%;">💾 Guardar Cambios</button>
+            <button onclick="cerrarVistaSecundaria()" class="btn-cancelar">Cancelar</button>
+        </div>
+    `;
+}
+
+// Asegúrate de tener estas funciones de apoyo:
+function eliminarEstilo(index) {
+    let estilos = JSON.parse(localStorage.getItem("misEstilos")) || estilosPredeterminados;
+    estilos.splice(index, 1);
+    localStorage.setItem("misEstilos", JSON.stringify(estilos));
+    configurarEstilos(); // Refresca la vista
+}
+
+function actualizarEstiloIndividual(index, nuevoValor) {
+    let estilos = JSON.parse(localStorage.getItem("misEstilos")) || estilosPredeterminados;
+    estilos[index] = nuevoValor;
+    localStorage.setItem("misEstilos", JSON.stringify(estilos));
+}
+
+// 2. AGREGAR SESIÓN
+function mostrarSeccion(tipo) {
+    if (tipo === 'crear') {
+        const cont = document.getElementById("contenido-secundario");
+        document.getElementById("vista-secundaria").classList.remove("hidden");
+        cont.innerHTML = `
+            <div class="cuadro-dashboard" style="margin: 15px;">
+                <h2 style="margin-top:0;">Nueva Sesión</h2>
+                <input type="date" id="fecha" value="${new Date().toISOString().split("T")[0]}">
+                <input type="text" id="notas" placeholder="Ej: Entrenamiento con aletas...">
+                <button onclick="crearSesion()" class="btn-primary" style="width:100%;">Guardar Sesión</button>
+                <button onclick="cerrarVistaSecundaria()" class="btn-cancelar">Cancelar</button>
             </div>
         `;
-    });
+    }
+}
+
+// 3. EDITAR SESIÓN
+function prepararEdicionSesion(id, event) {
+    event.stopPropagation();
+    const tx = db.transaction(["sesiones"], "readonly");
+    tx.objectStore("sesiones").get(id).onsuccess = (e) => {
+        const s = e.target.result;
+        const cont = document.getElementById("contenido-secundario");
+        document.getElementById("vista-secundaria").classList.remove("hidden");
+        cont.innerHTML = `
+            <div class="cuadro-dashboard" style="margin: 15px;">
+                <h2 style="margin-top:0;">Editar Sesión</h2>
+                <input type="date" id="edit-fecha" value="${s.fecha.split('T')[0]}">
+                <input type="text" id="edit-notas" value="${s.notas || ''}">
+                <button class="btn-primary" onclick="guardarEdicionSesion(${id})" style="width:100%;">Guardar Cambios</button>
+                <button class="btn-cancelar" onclick="cerrarVistaSecundaria()">Cancelar</button>
+            </div>
+        `;
+    };
+}
+
+// 4. QR (Ahora con botón Cancelar y sin "Volver")
+function mostrarQR() {
+    // Cerramos el menú si está abierto
+    const menu = document.getElementById("sideMenu");
+    if (menu && menu.classList.contains("active")) {
+        toggleMenu();
+    }
+
+    const vista = document.getElementById("vista-secundaria");
+    const cont = document.getElementById("contenido-secundario");
+    
+    vista.classList.remove("hidden");
+    cont.innerHTML = `
+        <div class="cuadro-dashboard" style="text-align:center; margin: 15px; padding: 30px 20px;">
+            <h2 style="margin-top:0; color:var(--primary);">Acceso al Club</h2>
+            <p style="color:var(--text-muted); font-size:0.9em; margin-bottom:20px;">
+                Presentá el código en el lector de la entrada.
+            </p>
+            
+            <div class="qr-container">
+                <img src="mi-qr.png" alt="Mi QR de Acceso" class="qr-img">
+            </div>
+
+            <p style="margin-top:20px; font-size:0.8em; color:var(--text-muted);">
+                💡 Tip: Subí el brillo de la pantalla si no lee.
+            </p>
+
+            <button onclick="cerrarVistaSecundaria()" class="btn-cancelar" style="margin-top:20px;">Cancelar</button>
+        </div>
+    `;
+}
+
+// 5. HORARIOS (Ahora con botón Cancelar y sin "Volver")
+function mostrarHorarios() {
+    const cont = document.getElementById("contenido-secundario");
+    document.getElementById("vista-secundaria").classList.remove("hidden");
+    cont.innerHTML = `
+        <div class="cuadro-dashboard" style="margin: 15px; margin-top:40px;">
+            <h2 style="margin-top:0;">Horarios de Pileta</h2>
+            <p><strong>Lun a Vie:</strong> 07:00 - 22:00</p>
+            <p><strong>Sábados:</strong> 08:00 - 14:00</p>
+            <button class="btn-cancelar" onclick="cerrarVistaSecundaria()" style="margin-top:20px;">Cancelar</button>
+        </div>
+    `;
+}
+
+// --- FORMULARIOS (Con botón Cancelar único) ---
+
+
+function mostrarAgregarBloque(sesionId) {
+    const vista = document.getElementById("vista-secundaria");
+    const cont = document.getElementById("contenido-secundario");
+    vista.classList.remove("hidden");
+    cont.innerHTML = `
+        <div class="cuadro-dashboard" style="margin: 15px;">
+            <h2 style="margin-top:0;">Nuevo Bloque</h2>
+            <label>Estilo:</label>
+            <input type="text" id="bloque-estilo" list="estilos-sugeridos" placeholder="Ej: Crol">
+            <datalist id="estilos-sugeridos">
+                ${(JSON.parse(localStorage.getItem("misEstilos")) || estilosPredeterminados).map(e => `<option value="${e}">`).join('')}
+            </datalist>
+            <label>Distancia (m):</label>
+            <input type="number" id="bloque-distancia" placeholder="Ej: 400">
+            <label>Duración (min):</label>
+            <input type="number" id="bloque-duracion" placeholder="Ej: 10">
+            <button class="btn-primary" onclick="guardarNuevoBloque(${sesionId})" style="width:100%; margin-top:10px;">💾 Guardar Bloque</button>
+            <button class="btn-secondary" onclick="cerrarVistaSecundaria()" style="width:100%; margin-top:10px; border:none; color:var(--text-muted);">Cancelar</button>
+        </div>
+    `;
+}
+
+function toggleMenu() { document.getElementById("sideMenu").classList.toggle("active"); }
+
+function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
+    localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+}
+
+function formatearFecha(f) {
+    const d = new Date(f);
+    return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+function crearSesion() {
+    const f = document.getElementById("fecha").value;
+    const n = document.getElementById("notas").value;
+    const tx = db.transaction(["sesiones"], "readwrite");
+    tx.objectStore("sesiones").add({ fecha: f, notas: n, distancia_total: 0, duracion_total: 0 });
+    tx.oncomplete = () => cerrarVistaSecundaria();
+}
+
+function borrarSesion(id, event) {
+    if(event) event.stopPropagation(); // Evitar que se cierre/abra el details
+    if (!confirm("¿Borrar?")) return;
+    const tx = db.transaction(["sesiones"], "readwrite");
+    tx.objectStore("sesiones").delete(id);
+    tx.oncomplete = () => actualizarDashboard();
+}
+
+function importarDatos() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = e => {
+        const reader = new FileReader();
+        reader.readAsText(e.target.files[0]);
+        reader.onload = res => {
+            const data = JSON.parse(res.target.result);
+            const tx = db.transaction(["sesiones", "bloques"], "readwrite");
+            data.sesiones.forEach(s => tx.objectStore("sesiones").put(s));
+            data.bloques.forEach(b => tx.objectStore("bloques").put(b));
+            tx.oncomplete = () => location.reload();
+        };
+    };
+    input.click();
+}
+
+function exportarDatos() {
+    const tx = db.transaction(["sesiones", "bloques"], "readonly");
+    const data = {};
+    tx.objectStore("sesiones").getAll().onsuccess = (e) => {
+        data.sesiones = e.target.result;
+        tx.objectStore("bloques").getAll().onsuccess = (e) => {
+            data.bloques = e.target.result;
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "backup_natacion.json";
+            a.click();
+        };
+    };
 }

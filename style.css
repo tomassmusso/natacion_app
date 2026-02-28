@@ -1,60 +1,209 @@
+:root {
+    /* Paleta Modo Claro - Profesional */
+    --bg: #f4f6f9;
+    --card-bg: #ffffff;
+    --text: #1a1a1b;
+    --text-muted: #65676b;
+    --primary: #0A84FF; /* Azul moderno */
+    --header-bg: #005bb5;
+    --success: #34C759;
+    --danger: #FF3B30;
+    --border: #e5e5e5;
+    --shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* Modo Oscuro - Colores Profundos */
+body.dark-mode {
+    --bg: #121212;
+    --card-bg: #1e1e1e;
+    --text: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --primary: #0A84FF;
+    --header-bg: #000000;
+    --border: #333333;
+    --shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #f4f6f9;
+    background-color: var(--bg);
+    color: var(--text);
     margin: 0;
-    padding: 20px;
+    padding-bottom: 90px;
+    transition: background 0.3s, color 0.3s;
 }
 
-h1 {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-h2 {
-    margin-top: 0;
-}
-
-.menu {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-button {
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    background-color: #2d7df6;
+.header {
+    position: sticky;
+    top: 0;
+    background: var(--header-bg);
     color: white;
-    font-size: 16px;
-    cursor: pointer;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-button:hover {
-    opacity: 0.9;
-}
+.titulo-app { font-size: 1.2rem; margin: 0; font-weight: 600; }
+.menu-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
 
-input {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-}
+/* Dashboard y Cards */
+.contenido { padding: 15px; }
 
-.card {
-    background: white;
-    padding: 15px;
+.cuadro-dashboard, .card-sesion {
+    background: var(--card-bg);
     border-radius: 12px;
+    padding: 15px;
     margin-bottom: 15px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
 }
 
-.section-title {
-    margin-top: 30px;
-    margin-bottom: 10px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 5px;
+/* Inputs y Formularios */
+input, select {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0 16px 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    box-sizing: border-box;
+    font-size: 16px;
+    transition: outline 0.2s;
+}
+input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+/* --- BOTONES MODERNOS --- */
+button {
+    font-family: inherit;
+    font-size: 15px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+    box-sizing: border-box;
+}
+
+.btn-primary { background: var(--primary); color: white; padding: 12px 20px; }
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-success { background: var(--success); color: white; padding: 12px 20px; }
+.btn-danger { background: var(--danger); color: white; padding: 12px 20px; }
+.btn-danger-sm { background: rgba(255,59,48,0.1); color: var(--danger); padding: 8px 12px; }
+
+.btn-secondary {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 12px 20px;
+}
+
+.btn-icon {
+    background: none; border: none; font-size: 1.2em; padding: 5px;
+    border-radius: 4px; transition: background 0.2s;
+}
+.btn-icon:hover { background: rgba(0,0,0,0.1); }
+body.dark-mode .btn-icon:hover { background: rgba(255,255,255,0.1); }
+
+/* Barra Inferior */
+.bottom-nav {
+    position: fixed; bottom: 0; width: 100%; height: 70px;
+    background: var(--card-bg);
+    display: flex;
+    border-top: 1px solid var(--border);
+    z-index: 20;
+}
+.nav-rect {
+    flex: 1; background: none; border: none;
+    color: var(--primary); font-weight: bold; font-size: 14px;
+}
+.nav-rect:first-child { border-right: 1px solid var(--border); }
+
+/* Botón Flotante */
+.fab {
+    position: fixed; bottom: 85px; right: 20px;
+    width: 60px; height: 60px; border-radius: 30px;
+    background: var(--primary); color: white;
+    font-size: 28px; box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4);
+    z-index: 15;
+}
+/* Estilo único para botones Cancelar */
+.btn-cancelar {
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    border: 1px solid var(--border) !important;
+    padding: 12px 20px;
+    width: 100%;
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+.btn-cancelar:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+}
+
+body.dark-mode .btn-cancelar:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.btn-danger-sm {
+    background: rgba(255, 59, 48, 0.1); /* Fondo rojizo suave */
+    color: #FF3B30; /* Texto rojo vibrante */
+    border: 1px solid rgba(255, 59, 48, 0.2);
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.btn-danger-sm:active {
+    background: #FF3B30;
+    color: white;
+}
+
+/* Menú Lateral */
+/* Ajuste para la X del menú lateral */
+.side-menu .btn-cerrar-menu {
+    width: auto !important; /* Ignora el width 100% general */
+    border: none !important;
+    background: transparent !important;
+    font-size: 20px;
+    padding: 5px 10px;
+    margin: 0;
+    float: right; /* La manda a la derecha */
+    color: var(--text-muted);
+}
+.side-menu {
+    position: fixed; top: 0; left: -250px; width: 200px; height: 100%;
+    background: var(--card-bg); padding: 20px; transition: 0.3s;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2); z-index: 100;
+}
+.side-menu.active { left: 0; }
+.side-menu button {
+    width: 100%; margin-bottom: 10px; text-align: left;
+    background: var(--bg); color: var(--text); 
+    border: 1px solid var(--border); padding: 12px;
+}
+.side-menu h3 { font-size: 1.1em; color: var(--text); margin-top: 0; }
+
+/* Vistas secundarias */
+.hidden { display: none; }
+.vista-secundaria {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg); z-index: 30; overflow-y: auto;
+}
+.header-secundario { padding: 15px; background: var(--header-bg); color: white; }
+
+/* Detalles Stats */
+.stat-item small {
+    display: block; color: var(--text-muted); font-size: 0.7em;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;
 }
