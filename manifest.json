@@ -1,4 +1,5 @@
 {
+  "id": "/natacion_app/",
   "name": "Natación Tracker",
   "short_name": "Natación",
   "start_url": "./index.html",
@@ -25,7 +26,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Pantalla principal de Natación"
+      "label": "Vista móvil"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Vista escritorio"
     }
   ]
 }
