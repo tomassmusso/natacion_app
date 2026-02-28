@@ -14,28 +14,23 @@ if ('serviceWorker' in navigator) {
 let deferredPrompt;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Evita que Chrome muestre el mini-banner automático
+  // Evita que el navegador lo muestre cuando él quiera
   e.preventDefault();
-  // Guarda el evento para usarlo después
+  // Guarda el evento para dispararlo nosotros
   deferredPrompt = e;
-  
-  // Aquí podés mostrar un botón tuyo que diga "Instalar"
-  const btnInstalar = document.getElementById('btnInstalar'); 
-  if (btnInstalar) {
-      btnInstalar.style.display = 'block';
+  console.log("Evento de instalación capturado y listo.");
+});
 
-      btnInstalar.addEventListener('click', () => {
-        // Mostramos el cuadrado oficial de instalación
-        deferredPrompt.prompt();
-        
-        // Esperamos a ver qué eligió el usuario
-        deferredPrompt.userChoice.then((choiceResult) => {
-          if (choiceResult.outcome === 'accepted') {
-            console.log('El usuario aceptó instalar');
-          }
-          deferredPrompt = null;
-        });
-      });
+// Disparar el "cuadrado" de instalación al primer toque en la pantalla
+window.addEventListener('click', () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('El usuario instaló la app');
+      }
+      deferredPrompt = null;
+    });
   }
 });
 
@@ -606,4 +601,5 @@ function exportarDatos() {
     };
 
 }
+
 
