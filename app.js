@@ -10,6 +10,34 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Evita que Chrome muestre el mini-banner automático
+  e.preventDefault();
+  // Guarda el evento para usarlo después
+  deferredPrompt = e;
+  
+  // Aquí podés mostrar un botón tuyo que diga "Instalar"
+  const btnInstalar = document.getElementById('btnInstalar'); 
+  if (btnInstalar) {
+      btnInstalar.style.display = 'block';
+
+      btnInstalar.addEventListener('click', () => {
+        // Mostramos el cuadrado oficial de instalación
+        deferredPrompt.prompt();
+        
+        // Esperamos a ver qué eligió el usuario
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('El usuario aceptó instalar');
+          }
+          deferredPrompt = null;
+        });
+      });
+  }
+});
+
 
 function agregarInputEstilo() {
     const div = document.createElement("div");
@@ -575,4 +603,5 @@ function exportarDatos() {
             a.click();
         };
     };
+
 }
