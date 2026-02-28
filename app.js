@@ -14,21 +14,16 @@ if ('serviceWorker' in navigator) {
 let deferredPrompt;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Evita que el navegador lo muestre cuando él quiera
   e.preventDefault();
-  // Guarda el evento para dispararlo nosotros
   deferredPrompt = e;
-  console.log("Evento de instalación capturado y listo.");
+  console.log("✅ Requisitos de instalación cumplidos");
 });
 
-// Disparar el "cuadrado" de instalación al primer toque en la pantalla
 window.addEventListener('click', () => {
   if (deferredPrompt) {
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('El usuario instaló la app');
-      }
+    deferredPrompt.userChoice.then((choice) => {
+      if (choice.outcome === 'accepted') console.log('¡Instalada!');
       deferredPrompt = null;
     });
   }
@@ -601,5 +596,6 @@ function exportarDatos() {
     };
 
 }
+
 
 
