@@ -500,8 +500,12 @@ function mostrarHorarios() {
     cont.innerHTML = `
         <div class="cuadro-dashboard" style="margin: 15px; margin-top:40px;">
             <h2 style="margin-top:0;">Horarios de Pileta</h2>
-            <p><strong>Lun a Vie:</strong> 07:00 - 22:00</p>
-            <p><strong>Sábados:</strong> 08:00 - 14:00</p>
+            <p><strong>Lunes:</strong> 07:30 - 14:00, 16:30</p>
+            <p><strong>Martes:</strong> 07:30 - 16:00, 19:00 - 22:00</p>
+            <p><strong>Miércoles:</strong> 07:30 - 14:00, 16:30</p>
+            <p><strong>Jueves:</strong> 07:30 - 16:00, 19:00 - 22:00</p>
+            <p><strong>Viernes:</strong> 07:30 - 14:00, 16:30</p>
+            <p><strong>Sábados:</strong> 08:00 - 10:00, 13:00 - 20:00</p>
             <button class="btn-cancelar" onclick="cerrarVistaSecundaria()" style="margin-top:20px;">Cancelar</button>
         </div>
     `;
