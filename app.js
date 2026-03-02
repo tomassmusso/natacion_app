@@ -13,22 +13,23 @@ if ('serviceWorker' in navigator) {
 
 let deferredPrompt;
 
+// --- 1. BLOQUE DE INSTALACIÓN (Líneas 14-39 aprox) ---
+// Reemplaza el bloque 'beforeinstallprompt' por este más limpio:
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  console.log("✅ Requisitos de instalación cumplidos");
 });
 
+// Al tocar cualquier parte de la app, si está lista para instalar, saltará el cartel
 window.addEventListener('click', () => {
   if (deferredPrompt) {
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then((choice) => {
-      if (choice.outcome === 'accepted') console.log('¡Instalada!');
+      if (choice.outcome === 'accepted') console.log('App Instalada');
       deferredPrompt = null;
     });
   }
 });
-
 
 function agregarInputEstilo() {
     const div = document.createElement("div");
@@ -215,7 +216,8 @@ function guardarEdicionSesion(id) {
 
     store.get(id).onsuccess = (e) => {
         const sesion = e.target.result;
-        sesion.fecha = new Date(nuevaFecha).toISOString();
+        // CORRECCIÓN: Aplicamos la misma lógica de reemplazo de guiones
+        sesion.fecha = new Date(nuevaFecha.replace(/-/g, '\/')).toISOString();
         sesion.notas = nuevasNotas;
         store.put(sesion);
     };
@@ -436,7 +438,7 @@ function mostrarSeccion(tipo) {
             <div class="cuadro-dashboard" style="margin: 15px;">
                 <h2 style="margin-top:0;">Nueva Sesión</h2>
                 <input type="date" id="fecha" value="${new Date().toISOString().split("T")[0]}">
-                <input type="text" id="notas" placeholder="Ej: Entrenamiento con aletas...">
+                <input type="text" id="notas" placeholder="Notas">
                 <button onclick="crearSesion()" class="btn-primary" style="width:100%;">Guardar Sesión</button>
                 <button onclick="cerrarVistaSecundaria()" class="btn-cancelar">Cancelar</button>
             </div>
@@ -456,7 +458,7 @@ function prepararEdicionSesion(id, event) {
             <div class="cuadro-dashboard" style="margin: 15px;">
                 <h2 style="margin-top:0;">Editar Sesión</h2>
                 <input type="date" id="edit-fecha" value="${s.fecha.split('T')[0]}">
-                <input type="text" id="edit-notas" value="${s.notas || ''}">
+                <input type="text" placeholder="Notas" id="edit-notas" value="${s.notas || ''}">
                 <button class="btn-primary" onclick="guardarEdicionSesion(${id})" style="width:100%;">Guardar Cambios</button>
                 <button class="btn-cancelar" onclick="cerrarVistaSecundaria()">Cancelar</button>
             </div>
@@ -478,18 +480,13 @@ function mostrarQR() {
     vista.classList.remove("hidden");
     cont.innerHTML = `
         <div class="cuadro-dashboard" style="text-align:center; margin: 15px; padding: 30px 20px;">
-            <h2 style="margin-top:0; color:var(--primary);">Acceso al Club</h2>
-            <p style="color:var(--text-muted); font-size:0.9em; margin-bottom:20px;">
-                Presentá el código en el lector de la entrada.
-            </p>
+            <h2 style="margin-top:0; color:var(--primary);">QR de Acceso</h2>
+
             
             <div class="qr-container">
-                <img src="mi-qr.png" alt="Mi QR de Acceso" class="qr-img">
+                <img src="mi-qr.png" alt="QR de Acceso" class="qr-img">
             </div>
 
-            <p style="margin-top:20px; font-size:0.8em; color:var(--text-muted);">
-                💡 Tip: Subí el brillo de la pantalla si no lee.
-            </p>
 
             <button onclick="cerrarVistaSecundaria()" class="btn-cancelar" style="margin-top:20px;">Cancelar</button>
         </div>
@@ -521,14 +518,14 @@ function mostrarAgregarBloque(sesionId) {
         <div class="cuadro-dashboard" style="margin: 15px;">
             <h2 style="margin-top:0;">Nuevo Bloque</h2>
             <label>Estilo:</label>
-            <input type="text" id="bloque-estilo" list="estilos-sugeridos" placeholder="Ej: Crol">
+            <input type="text" id="bloque-estilo" list="estilos-sugeridos">
             <datalist id="estilos-sugeridos">
                 ${(JSON.parse(localStorage.getItem("misEstilos")) || estilosPredeterminados).map(e => `<option value="${e}">`).join('')}
             </datalist>
             <label>Distancia (m):</label>
-            <input type="number" id="bloque-distancia" placeholder="Ej: 400">
+            <input type="number" id="bloque-distancia" >
             <label>Duración (min):</label>
-            <input type="number" id="bloque-duracion" placeholder="Ej: 10">
+            <input type="number" id="bloque-duracion" >
             <button class="btn-primary" onclick="guardarNuevoBloque(${sesionId})" style="width:100%; margin-top:10px;">💾 Guardar Bloque</button>
             <button class="btn-secondary" onclick="cerrarVistaSecundaria()" style="width:100%; margin-top:10px; border:none; color:var(--text-muted);">Cancelar</button>
         </div>
@@ -547,11 +544,21 @@ function formatearFecha(f) {
     return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
 }
 
+// --- 2. CREAR SESIÓN (Corrección de fecha) ---
 function crearSesion() {
-    const f = document.getElementById("fecha").value;
+    const f = document.getElementById("fecha").value; // Viene como "YYYY-MM-DD"
     const n = document.getElementById("notas").value;
+    
+    // CORRECCIÓN: Usar barras '/' en lugar de guiones '-' para forzar hora local
+    const fechaLocal = new Date(f.replace(/-/g, '\/')).toISOString();
+
     const tx = db.transaction(["sesiones"], "readwrite");
-    tx.objectStore("sesiones").add({ fecha: f, notas: n, distancia_total: 0, duracion_total: 0 });
+    tx.objectStore("sesiones").add({ 
+        fecha: fechaLocal, 
+        notas: n, 
+        distancia_total: 0, 
+        duracion_total: 0 
+    });
     tx.oncomplete = () => cerrarVistaSecundaria();
 }
 
@@ -596,6 +603,4 @@ function exportarDatos() {
     };
 
 }
-
-
 

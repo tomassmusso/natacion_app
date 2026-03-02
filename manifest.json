@@ -1,5 +1,4 @@
 {
-  "id": "/natacion_app/",
   "name": "Natación Tracker",
   "short_name": "Natación",
   "start_url": "./index.html",
@@ -8,16 +7,10 @@
   "theme_color": "#0d47a1",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [
@@ -25,15 +18,13 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Vista móvil"
+      "form_factor": "narrow"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Vista escritorio"
+      "form_factor": "wide"
     }
   ]
 }
